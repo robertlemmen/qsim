@@ -41,6 +41,11 @@ enum QueueOverflowBehavior (
 class Queue {
     has $.size;
     has $.overflow-behavior;
+    has $.sink is rw;
+    
+    method plot-node($id) {
+        say "  $id [label=\"Queue s=$!size\", shape=rect]";
+    }
 }
 
 =begin pod
@@ -58,6 +63,11 @@ in parallel.
 class Processor {
     has $.capacity;
     has $.proc-func;
+    has $.sink is rw;
+    
+    method plot-node($id) {
+        say "  $id [label=\"Processor c=$!capacity\", shape=ellipse]";
+    }
 }
 
 =begin pod
@@ -97,7 +107,7 @@ So a simple setup could look like this:
 =end pod
 
 class Route {
-    has @.sinks;
+    has @.sinks is rw;
     has $.sink-select-func;
 }
 
@@ -111,7 +121,100 @@ regular routing, or through a specal failure channel.
 =end pod
 
 class TestBed {
-    has $.network-input;
-    has $.network-output;
+    has $.sink is rw;
     has $.producer-func;
+
+    method plot-node($id) {
+        say "  $id [label=\"TestBed\", shape=parallelogram, rank=0]";
+    }
 }
+
+# XXX docs, also needs to have slurpy second arg
+sub connect($a, $b) {
+    $a.sink = Route.new(sinks => ($b));
+}
+
+my $example = TestBed.new;
+my $q1 = Queue.new(size => 5);
+my $p1 = Processor.new(capacity => 2);
+
+connect($example, $q1);
+connect($q1, $p1);
+connect($p1, $example);
+
+sub plot-network($start-node) {
+    my $node = $start-node;
+    my %seen{Any}; # XXX put outside inner loop
+    my $node-id-seq = 1;
+
+    # XXX put testbed in own subgraph to render it outside the 
+    # rest of the graph
+
+    say "digraph G \{";
+    say "  rankdir=LR";
+
+    sub rec-iterate($node) {
+        if %seen{$node} {
+            return %seen{$node};
+        }
+
+        %seen{$node} = $node-id-seq;
+        $node.plot-node($node-id-seq); 
+        my $node-id = $node-id-seq++;
+        my $route = $node.sink;
+        for $route.sinks -> $next-node {
+            my $next-id = rec-iterate($next-node);
+            say "  $node-id -> $next-id"
+        }
+        return $node-id;
+    }
+
+    rec-iterate($start-node);
+
+    say "\}";
+}
+
+plot-network($example);
+
+# XXX need an event scheduler
+
+sub simulate($samples) {
+    # XXX loop over $samples and emit them, essentially just placing them in the
+    # scheduler. this needs all nodes to be connected to a scheduler, perhaps we
+    # just pass that into the handle call? 
+    # once we have them all emitted, just work on the scheduler until it is
+    # drained
+}
+
+# XXX how do we get a poisson-distributed random distance function
+# https://preshing.com/20111007/how-to-generate-random-timings-for-a-poisson-process/
+# generate random number 0..1 if we want an event every X on average, then we
+# need -ln U * X as the interval to the next. try this
+
+sub random-poisson-distance($average-distance) {
+    return 1.rand.log * $average-distance * -1;
+}
+
+# based on this we can build a simple event generator for the testbed
+sub tb-producer() {
+    return (random-poisson-distance(60), "");
+}
+
+# so the simulator can just loop over the number fo samples with a time
+# initialized to zero, and increment the time with what was returned
+
+# my $total = 0.0;
+# my @hist;
+# for ^1000000 {
+#     my $sample = random-poisson-distance(4);
+#     $total += $sample;
+#     my $idx = round($sample*20);
+#     @hist[$idx]++;
+#     
+# }
+# say "total: $total";
+# my $idx = 0;
+# for ^500 -> $idx {
+#     my $cv = @hist[$idx] // 0;
+#     say "$idx $cv";
+# }
