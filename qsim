@@ -42,18 +42,32 @@ class Queue {
     has $.size;
     has $.overflow-behavior;
     has $.sink is rw;
-    
+    has @!queue;
+
     method plot-node($id) {
         say "  $id [label=\"Queue s=$!size\", shape=rect]";
+    }
+
+    method handle($message) {
+        say "enqueuing $message";
+        if @!queue.elems == 0 {
+            # pass directly to sink
+            # XXX only if the sink has capacity...
+            $!sink.handle($message);
+        }
+        # XXX implement
+    }
+
+    method tick($time) {
     }
 }
 
 =begin pod
 =head3 Processors
 
-At the end of each queue sits a processor that consumes messages from the queue, 
+At the end of each queue sits a processor that consumes messages from the queue,
 does something with them by virtue of a processing callable that modifies the
-item if necessary and also determines the simulated time needed for this 
+item if necessary and also determines the simulated time needed for this
 processing.
 
 Processors also have a configurable capacity of how many items can be processed
@@ -64,23 +78,32 @@ class Processor {
     has $.capacity;
     has $.proc-func;
     has $.sink is rw;
-    
+    has $!currently-active = 0;
+
     method plot-node($id) {
         say "  $id [label=\"Processor c=$!capacity\", shape=ellipse]";
+    }
+
+    method handle($message) {
+        say "handling $message";
+        # XXX implement
+    }
+
+    method tick($time) {
     }
 }
 
 =begin pod
 =head3 Routes
 
-Processors emit their messages to routes which are typically (but see next 
-paragraph for exceptions) connected to one or more sink queues, and have a 
+Processors emit their messages to routes which are typically (but see next
+paragraph for exceptions) connected to one or more sink queues, and have a
 function that decides which queue a message should be routed to.
 
-There are exactly two exceptional routes in any model this software uses: 
+There are exactly two exceptional routes in any model this software uses:
 an input route that receives all messages that are sent through the network.
-These are not emitted by a processor but by a network simulation test bed 
-object. Similarily, there is a single route that does not emit messages into 
+These are not emitted by a processor but by a network simulation test bed
+object. Similarily, there is a single route that does not emit messages into
 a queue, the output route that sends (non-failure) messages to the test bed
 receiver.
 
@@ -109,23 +132,38 @@ So a simple setup could look like this:
 class Route {
     has @.sinks is rw;
     has $.sink-select-func;
+
+    method handle($message) {
+        # XXX for now we do not suport multiple sinks or a sink-select-func
+        @!sinks[0].handle($message);
+    }
 }
 
 =begin pod
 =head3 Simulation Test Bed
 
 The simulation test bed produces messages using a producer callable that also
-defines the interval between a message and the next, and then sends these 
+defines the interval between a message and the next, and then sends these
 messages through the network. They either arrive back at the test bed through
 regular routing, or through a specal failure channel.
 =end pod
 
 class TestBed {
     has $.sink is rw;
-    has $.producer-func;
+    has &.producer-func;
+    has $!next-emission = 0;
 
     method plot-node($id) {
         say "  $id [label=\"TestBed\", shape=parallelogram, rank=0]";
+    }
+
+    method tick($time) {
+        if $time >= $!next-emission {
+           my ($next-time, $message) = &!producer-func();
+            $!sink.handle($message);
+            $*event-scheduler.next-tick-in($next-time);
+            $!next-emission = $next-time;
+        }
     }
 }
 
@@ -134,20 +172,12 @@ sub connect($a, $b) {
     $a.sink = Route.new(sinks => ($b));
 }
 
-my $example = TestBed.new;
-my $q1 = Queue.new(size => 5);
-my $p1 = Processor.new(capacity => 2);
-
-connect($example, $q1);
-connect($q1, $p1);
-connect($p1, $example);
-
 sub plot-network($start-node) {
     my $node = $start-node;
     my %seen{Any}; # XXX put outside inner loop
     my $node-id-seq = 1;
 
-    # XXX put testbed in own subgraph to render it outside the 
+    # XXX put testbed in own subgraph to render it outside the
     # rest of the graph
 
     say "digraph G \{";
@@ -159,7 +189,7 @@ sub plot-network($start-node) {
         }
 
         %seen{$node} = $node-id-seq;
-        $node.plot-node($node-id-seq); 
+        $node.plot-node($node-id-seq);
         my $node-id = $node-id-seq++;
         my $route = $node.sink;
         for $route.sinks -> $next-node {
@@ -174,17 +204,7 @@ sub plot-network($start-node) {
     say "\}";
 }
 
-plot-network($example);
-
-# XXX need an event scheduler
-
-sub simulate($samples) {
-    # XXX loop over $samples and emit them, essentially just placing them in the
-    # scheduler. this needs all nodes to be connected to a scheduler, perhaps we
-    # just pass that into the handle call? 
-    # once we have them all emitted, just work on the scheduler until it is
-    # drained
-}
+#plot-network($example);
 
 # XXX how do we get a poisson-distributed random distance function
 # https://preshing.com/20111007/how-to-generate-random-timings-for-a-poisson-process/
@@ -197,24 +217,57 @@ sub random-poisson-distance($average-distance) {
 
 # based on this we can build a simple event generator for the testbed
 sub tb-producer() {
-    return (random-poisson-distance(60), "");
+    state $i = 0;
+    return (random-poisson-distance(60), "m" ~ $i++);
 }
 
-# so the simulator can just loop over the number fo samples with a time
-# initialized to zero, and increment the time with what was returned
+my $example = TestBed.new(producer-func => &tb-producer);
+my $q1 = Queue.new(size => 5);
+my $p1 = Processor.new(capacity => 2);
 
-# my $total = 0.0;
-# my @hist;
-# for ^1000000 {
-#     my $sample = random-poisson-distance(4);
-#     $total += $sample;
-#     my $idx = round($sample*20);
-#     @hist[$idx]++;
-#     
-# }
-# say "total: $total";
-# my $idx = 0;
-# for ^500 -> $idx {
-#     my $cv = @hist[$idx] // 0;
-#     say "$idx $cv";
-# }
+connect($example, $q1);
+connect($q1, $p1);
+connect($p1, $example);
+
+class EventScheduler {
+    has @!components;
+    has @!scheduled-ticks;
+    has $!current-time;
+
+    method register($comp) {
+        @!components.push($comp);
+    }
+
+    method simulate($duration) {
+        $!current-time = 0;
+        # for the dynamic access
+        my $*event-scheduler = self;
+
+        # XXX scheduler "this" for dynamic lookup
+
+        while $!current-time < $duration {
+            # for dynamic access
+            @!components.map({ .tick($!current-time) });
+
+            @!scheduled-ticks.sort;
+            $!current-time = @!scheduled-ticks.shift;
+        }
+    }
+
+    method next-tick-at($time) {
+        say "scheduling tick at $time";
+        @!scheduled-ticks.push($time);
+    }
+
+    method next-tick-in($duration) {
+        my $time = $!current-time + $duration;
+        say "scheduling tick at $time";
+        @!scheduled-ticks.push($time);
+    }
+}
+
+my $scheduler = EventScheduler.new;
+$scheduler.register($example);
+$scheduler.register($q1);
+$scheduler.register($p1);
+$scheduler.simulate(400);
