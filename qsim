@@ -49,16 +49,27 @@ class Queue {
     }
 
     method handle($message) {
-        say "enqueuing $message";
         if @!queue.elems == 0 {
             # pass directly to sink
-            # XXX only if the sink has capacity...
-            $!sink.handle($message);
+            if $!sink.handle($message) {
+                return True;
+            }
         }
-        # XXX implement
+        say "  enqueuing $message";
+        @!queue.push($message);
+        # XXX does not handle overflows at the moment
+        return True;
     }
 
-    method tick($time) {
+    method tick() {
+        if @!queue.elems {
+            if $!sink.handle(@!queue.first) {
+                say "  dequeued {@!queue.first}";
+                @!queue.shift;
+                return True;
+            }
+            return False;
+        }
     }
 }
 
@@ -76,20 +87,40 @@ in parallel.
 
 class Processor {
     has $.capacity;
-    has $.proc-func;
+    has &.proc-func;
     has $.sink is rw;
     has $!currently-active = 0;
+    has @!processing-messages;
+    has @!processing-done-times;
 
     method plot-node($id) {
         say "  $id [label=\"Processor c=$!capacity\", shape=ellipse]";
     }
 
     method handle($message) {
-        say "handling $message";
-        # XXX implement
+        if $!currently-active < $!capacity {
+            say "  handling $message";
+            $!currently-active++;
+            # XXX only handles capacity == 1 at the moment
+            my ($done-time, $out-message) = &!proc-func($message);
+            $*event-scheduler.next-tick-in($done-time);
+            @!processing-messages[0] = $out-message;
+            @!processing-done-times[0] = $*current-time + $done-time;
+            return True;
+        }
+        else {
+            return False;
+        }
     }
 
-    method tick($time) {
+    method tick() {
+        if $*current-time >= @!processing-done-times[0] {
+            if $!sink.handle(@!processing-messages[0]) {
+                say "  finished processing {@!processing-messages[0]}";
+                $!currently-active--;
+            }
+        }
+        return False;
     }
 }
 
@@ -135,7 +166,7 @@ class Route {
 
     method handle($message) {
         # XXX for now we do not suport multiple sinks or a sink-select-func
-        @!sinks[0].handle($message);
+        return @!sinks[0].handle($message);
     }
 }
 
@@ -157,13 +188,22 @@ class TestBed {
         say "  $id [label=\"TestBed\", shape=parallelogram, rank=0]";
     }
 
-    method tick($time) {
-        if $time >= $!next-emission {
-           my ($next-time, $message) = &!producer-func();
-            $!sink.handle($message);
+    method handle($message) {
+        say "  $message done!";
+    }
+
+    method tick() {
+        if $*current-time >= $!next-emission {
+            my ($next-time, $message) = &!producer-func();
+            say "  testbed emitting $message";
+            if ! $!sink.handle($message) {
+                # XXX handle better
+                say "$message dropped due to backlog";
+            }
             $*event-scheduler.next-tick-in($next-time);
-            $!next-emission = $next-time;
+            $!next-emission = $*current-time + $next-time;
         }
+        return False;
     }
 }
 
@@ -218,12 +258,16 @@ sub random-poisson-distance($average-distance) {
 # based on this we can build a simple event generator for the testbed
 sub tb-producer() {
     state $i = 0;
-    return (random-poisson-distance(60), "m" ~ $i++);
+    return (random-poisson-distance(30), "m" ~ $i++);
+}
+
+sub p1-processor($message) {
+    return (random-poisson-distance(30), $message ~ '+');
 }
 
 my $example = TestBed.new(producer-func => &tb-producer);
 my $q1 = Queue.new(size => 5);
-my $p1 = Processor.new(capacity => 2);
+my $p1 = Processor.new(proc-func => &p1-processor, capacity => 1);
 
 connect($example, $q1);
 connect($q1, $p1);
@@ -232,36 +276,47 @@ connect($p1, $example);
 class EventScheduler {
     has @!components;
     has @!scheduled-ticks;
-    has $!current-time;
 
     method register($comp) {
         @!components.push($comp);
     }
 
-    method simulate($duration) {
-        $!current-time = 0;
+    method simulate($duration, $measurement-interval) {
+        my $*current-time = 0;
         # for the dynamic access
         my $*event-scheduler = self;
+        my $next-measurement = 0;
 
-        # XXX scheduler "this" for dynamic lookup
-
-        while $!current-time < $duration {
-            # for dynamic access
-            @!components.map({ .tick($!current-time) });
+        while $*current-time < $duration {
+            say "tick $*current-time";
+            if $*current-time >= $next-measurement {
+                say "measurement";
+                $next-measurement += $measurement-interval;
+                # XXX measure all the things!
+            }
+            my $run-again;
+            # if one component change state, we prod them all again to make sure
+            # all possible state changes have happened
+            repeat {
+                $run-again = False;
+                for @!components -> $comp {                
+                    $run-again = $run-again ?| $comp.tick();
+                }
+            } while $run-again;
 
             @!scheduled-ticks.sort;
-            $!current-time = @!scheduled-ticks.shift;
+            $*current-time = @!scheduled-ticks.shift;
         }
     }
 
     method next-tick-at($time) {
-        say "scheduling tick at $time";
+#        say "scheduling tick at $time";
         @!scheduled-ticks.push($time);
     }
 
     method next-tick-in($duration) {
-        my $time = $!current-time + $duration;
-        say "scheduling tick at $time";
+        my $time = $*current-time + $duration;
+#        say "scheduling tick at $time";
         @!scheduled-ticks.push($time);
     }
 }
@@ -270,4 +325,4 @@ my $scheduler = EventScheduler.new;
 $scheduler.register($example);
 $scheduler.register($q1);
 $scheduler.register($p1);
-$scheduler.simulate(400);
+$scheduler.simulate(500, 10);
