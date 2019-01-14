@@ -39,6 +39,7 @@ enum QueueOverflowBehavior (
 );
 
 class Queue {
+    has $.id;
     has $.size;
     has $.overflow-behavior;
     has $.sink is rw;
@@ -71,6 +72,10 @@ class Queue {
             return False;
         }
     }
+
+    method measure() {
+        return @!queue.elems;
+    }
 }
 
 =begin pod
@@ -86,6 +91,7 @@ in parallel.
 =end pod
 
 class Processor {
+    has $.id;
     has $.capacity;
     has &.proc-func;
     has $.sink is rw;
@@ -121,6 +127,10 @@ class Processor {
             }
         }
         return False;
+    }
+    
+    method measure() {
+        return $!currently-active;
     }
 }
 
@@ -180,6 +190,7 @@ regular routing, or through a specal failure channel.
 =end pod
 
 class TestBed {
+    has $.id = "tb";
     has $.sink is rw;
     has &.producer-func;
     has $!next-emission = 0;
@@ -204,6 +215,11 @@ class TestBed {
             $!next-emission = $*current-time + $next-time;
         }
         return False;
+    }
+
+    method measure() {
+        # XXX not sure what to do
+        return 0;
     }
 }
 
@@ -266,8 +282,8 @@ sub p1-processor($message) {
 }
 
 my $example = TestBed.new(producer-func => &tb-producer);
-my $q1 = Queue.new(size => 5);
-my $p1 = Processor.new(proc-func => &p1-processor, capacity => 1);
+my $q1 = Queue.new(id => "q1", size => 5);
+my $p1 = Processor.new(id => "p1", proc-func => &p1-processor, capacity => 1);
 
 connect($example, $q1);
 connect($q1, $p1);
@@ -286,11 +302,17 @@ class EventScheduler {
         # for the dynamic access
         my $*event-scheduler = self;
         my $next-measurement = 0;
+        my @measurements;
 
         while $*current-time < $duration {
             say "tick $*current-time";
-            if $*current-time >= $next-measurement {
-                say "measurement";
+            while $*current-time >= $next-measurement {
+                my %measurement = { time => $next-measurement };
+                say "measurement $next-measurement";
+                for @!components -> $comp {
+                    %measurement{$comp.id} = $comp.measure();
+                }
+                @measurements.push(%measurement);
                 $next-measurement += $measurement-interval;
                 # XXX measure all the things!
             }
@@ -307,6 +329,7 @@ class EventScheduler {
             @!scheduled-ticks.sort;
             $*current-time = @!scheduled-ticks.shift;
         }
+        return @measurements;
     }
 
     method next-tick-at($time) {
