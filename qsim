@@ -289,11 +289,11 @@ sub random-poisson-distance($average-distance) {
 # based on this we can build a simple event generator for the testbed
 sub tb-producer() {
     state $i = 0;
-    return (random-poisson-distance(30), "m" ~ $i++);
+    return (random-poisson-distance(35), "m" ~ $i++);
 }
 
 sub p1-processor($message) {
-    return (random-poisson-distance(30), $message ~ '+');
+    return (random-poisson-distance(35), $message ~ '+');
 }
 
 my $example = TestBed.new(producer-func => &tb-producer);
@@ -372,7 +372,7 @@ $scheduler.register($p1);
 
 my @results;
 for ^10 {
-    my @m = $scheduler.simulate(500, 10);
+    my @m = $scheduler.simulate(1000, 1);
     @results.push(@m);
 }
 
@@ -412,7 +412,7 @@ sub apply-aggregate(@input-results, %aggregators) {
     return @output;
 }
 
-say apply-aggregate(@results, {
+@results = apply-aggregate(@results, {
     time => sub (@vals) { return time => @vals[0]; }, # XXX we should also assert they are all the same!
     p1 => sub (@vals) {
         my $mean = ([+] @vals).Num / @vals.elems;
@@ -434,3 +434,14 @@ say apply-aggregate(@results, {
         return {};
     }
 });
+
+sub dump-results(@results) {
+    my @header-fields = @results[0].keys.sort;
+    
+    say @header-fields.map({ sprintf("%12s", $_) }).join();
+    for @results -> %r {
+        say %r{@header-fields}.map({ $_ // -1 }).map({ sprintf("%12.6f", $_) }).join();
+    }
+}
+
+dump-results(@results);
