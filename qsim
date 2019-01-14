@@ -56,8 +56,8 @@ class Queue {
                 return True;
             }
         }
-        say "  enqueuing $message";
         @!queue.push($message);
+        say "  enqueuing $message, now at {@!queue.elems}";
         # XXX does not handle overflows at the moment
         return True;
     }
@@ -69,8 +69,8 @@ class Queue {
     method tick() {
         if @!queue.elems {
             if $!sink.handle(@!queue.first) {
-                say "  dequeued {@!queue.first}";
-                @!queue.shift;
+                my $prev-msg = @!queue.shift;
+                say "  dequeued {$prev-msg}, now at {@!queue.elems}";
                 return True;
             }
             return False;
@@ -109,10 +109,10 @@ class Processor {
 
     method handle($message) {
         if $!currently-active < $!capacity {
-            say "  handling $message";
             $!currently-active++;
             # XXX only handles capacity == 1 at the moment
             my ($done-time, $out-message) = &!proc-func($message);
+            say "  handling $message, will take $done-time";
             $*event-scheduler.next-tick-in($done-time);
             @!processing-messages[0] = $out-message;
             @!processing-done-times[0] = $*current-time + $done-time;
@@ -131,10 +131,11 @@ class Processor {
 
 
     method tick() {
-        if $*current-time >= @!processing-done-times[0] {
+        if $!currently-active > 0 && $*current-time >= @!processing-done-times[0] {
             if $!sink.handle(@!processing-messages[0]) {
                 say "  finished processing {@!processing-messages[0]}";
                 $!currently-active--;
+                return True;
             }
         }
         return False;
@@ -221,7 +222,7 @@ class TestBed {
     method tick() {
         if $*current-time >= $!next-emission {
             my ($next-time, $message) = &!producer-func();
-            say "  testbed emitting $message";
+            say "  testbed emitting $message, next one ine $next-time";
             if ! $!sink.handle($message) {
                 # XXX handle better
                 say "$message dropped due to backlog";
@@ -293,7 +294,7 @@ sub tb-producer() {
 }
 
 sub p1-processor($message) {
-    return (random-poisson-distance(35), $message ~ '+');
+    return (random-poisson-distance(30), $message ~ '+');
 }
 
 my $example = TestBed.new(producer-func => &tb-producer);
@@ -327,7 +328,7 @@ class EventScheduler {
         while $next-measurement < $duration {
             say "tick $*current-time";
             while $*current-time >= $next-measurement {
-                my %measurement = { time => $next-measurement };
+                my %measurement := { time => $next-measurement };
                 say "measurement $next-measurement";
                 for @!components -> $comp {
                     %measurement{$comp.id} = $comp.measure();
@@ -346,7 +347,7 @@ class EventScheduler {
                 }
             } while $run-again;
 
-            @!scheduled-ticks.sort;
+            @!scheduled-ticks = @!scheduled-ticks.sort;
             
             $*current-time = @!scheduled-ticks.shift;
         }
@@ -360,7 +361,7 @@ class EventScheduler {
 
     method next-tick-in($duration) {
         my $time = $*current-time + $duration;
-#        say "scheduling tick at $time";
+        say "scheduling tick at $time";
         @!scheduled-ticks.push($time);
     }
 }
@@ -371,8 +372,8 @@ $scheduler.register($q1);
 $scheduler.register($p1);
 
 my @results;
-for ^10 {
-    my @m = $scheduler.simulate(1000, 1);
+for ^1 {
+    my @m = $scheduler.simulate(5000, 10);
     @results.push(@m);
 }
 
@@ -444,4 +445,4 @@ sub dump-results(@results) {
     }
 }
 
-dump-results(@results);
+#dump-results(@results);
