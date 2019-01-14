@@ -62,6 +62,10 @@ class Queue {
         return True;
     }
 
+    method reset() {
+        @!queue = [];
+    }
+
     method tick() {
         if @!queue.elems {
             if $!sink.handle(@!queue.first) {
@@ -118,6 +122,13 @@ class Processor {
             return False;
         }
     }
+    
+    method reset() {
+        $!currently-active = 0;
+        @!processing-messages = [];
+        @!processing-done-times = [];
+    }
+
 
     method tick() {
         if $*current-time >= @!processing-done-times[0] {
@@ -201,6 +212,10 @@ class TestBed {
 
     method handle($message) {
         say "  $message done!";
+    }
+
+    method reset() {
+        $!next-emission = 0;
     }
 
     method tick() {
@@ -299,12 +314,17 @@ class EventScheduler {
 
     method simulate($duration, $measurement-interval) {
         my $*current-time = 0;
+        @!scheduled-ticks = [];
         # for the dynamic access
         my $*event-scheduler = self;
         my $next-measurement = 0;
         my @measurements;
 
-        while $*current-time < $duration {
+        for @!components -> $comp {
+            $comp.reset();
+        }
+
+        while $next-measurement < $duration {
             say "tick $*current-time";
             while $*current-time >= $next-measurement {
                 my %measurement = { time => $next-measurement };
@@ -327,6 +347,7 @@ class EventScheduler {
             } while $run-again;
 
             @!scheduled-ticks.sort;
+            
             $*current-time = @!scheduled-ticks.shift;
         }
         return @measurements;
@@ -348,4 +369,68 @@ my $scheduler = EventScheduler.new;
 $scheduler.register($example);
 $scheduler.register($q1);
 $scheduler.register($p1);
-$scheduler.simulate(500, 10);
+
+my @results;
+for ^10 {
+    my @m = $scheduler.simulate(500, 10);
+    @results.push(@m);
+}
+
+sub refold-results(@input-results) {
+    my @output;
+    for @input-results -> @cr {
+        my $idx = 0;
+        for @cr -> %ccr {
+            my $cor = @output[$idx] // { };
+            for %ccr.pairs -> $cp {
+                $cor{$cp.key}.push($cp.value);
+            }
+            @output[$idx] = $cor;
+            $idx++;
+        }
+    }
+    return @output;
+}
+
+@results = refold-results(@results);
+
+
+sub apply-aggregate(@input-results, %aggregators) {
+    my @output;
+    for @input-results -> %ci {
+        my %co;
+        for %ci.keys -> $k {
+            if %aggregators{$k}:exists {
+                %co.push(%aggregators{$k}(%ci{$k}));
+            }
+            else {
+                %co{$k} = %ci{$k};
+            }
+        }
+        @output.push(%co);
+    }
+    return @output;
+}
+
+say apply-aggregate(@results, {
+    time => sub (@vals) { return time => @vals[0]; }, # XXX we should also assert they are all the same!
+    p1 => sub (@vals) {
+        my $mean = ([+] @vals).Num / @vals.elems;
+        my $dev = Nil;
+        if (@vals.elems > 1) {
+            $dev = ([+] @vals.map({ ($_ - $mean) ** 2 })).Num / (@vals.elems - 1);
+        }
+        return p1_mean => $mean, p1_dev => $dev;
+    },
+    q1 => sub (@vals) { # XXX same as above refactor
+        my $mean = ([+] @vals).Num / @vals.elems;
+        my $dev = Nil;
+        if (@vals.elems > 1) {
+            $dev = ([+] @vals.map({ ($_ - $mean) ** 2 })).Num / (@vals.elems - 1);
+        }
+        return q1_mean => $mean, q1_dev => $dev;
+    },
+    tb => sub (@vals) {
+        return {};
+    }
+});
