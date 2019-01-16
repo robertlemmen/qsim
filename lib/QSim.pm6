@@ -378,11 +378,10 @@ sub apply-aggregate(@input-results, %aggregators) is export {
     return @output;
 }
 
-sub dump-results(@results) is export {
+sub dump-results(@results, $fh) is export {
     my @header-fields = @results[0].keys.sort;
-    
-    say @header-fields.map({ sprintf("%12s", $_) }).join();
+    $fh.say(@header-fields.map({ sprintf("%12s", $_) }).join());
     for @results -> %r {
-        say %r{@header-fields}.map({ $_ // -1 }).map({ sprintf("%12.6f", $_) }).join();
+        $fh.say(%r{@header-fields}.map({ $_ // -1 }).map({ sprintf("%12.6f", $_) }).join());
     }
 }
