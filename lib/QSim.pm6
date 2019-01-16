@@ -110,12 +110,18 @@ class Processor is export {
     method handle($message) {
         if $!currently-active < $!capacity {
             $!currently-active++;
-            # XXX only handles capacity == 1 at the moment
+            my $free-slot-idx = Nil;
+            for ^$!capacity -> $i {
+                if ! defined @!processing-messages[$i] {
+                    $free-slot-idx = $i;
+                    last;
+                }
+            }
             my ($done-time, $out-message) = &!proc-func($message);
             say "  handling $message, will take $done-time";
             $*event-scheduler.next-tick-in($done-time);
-            @!processing-messages[0] = $out-message;
-            @!processing-done-times[0] = $*current-time + $done-time;
+            @!processing-messages[$free-slot-idx] = $out-message;
+            @!processing-done-times[$free-slot-idx] = $*current-time + $done-time;
             return True;
         }
         else {
@@ -125,17 +131,21 @@ class Processor is export {
     
     method reset() {
         $!currently-active = 0;
-        @!processing-messages = [];
-        @!processing-done-times = [];
+        @!processing-messages = Nil xx $!capacity;
+        @!processing-done-times = Nil xx $!capacity;
     }
 
 
     method tick() {
-        if $!currently-active > 0 && $*current-time >= @!processing-done-times[0] {
-            if $!sink.handle(@!processing-messages[0]) {
-                say "  finished processing {@!processing-messages[0]}";
-                $!currently-active--;
-                return True;
+        for ^$!capacity -> $i {
+            if (defined @!processing-done-times[$i]) && $*current-time >= @!processing-done-times[$i] {
+                if $!sink.handle(@!processing-messages[$i]) {
+                    say "  finished processing {@!processing-messages[$i]}";
+                    $!currently-active--;
+                    @!processing-messages[$i] = Nil;
+                    @!processing-done-times[$i] = Nil;
+                    return True;
+                }
             }
         }
         return False;

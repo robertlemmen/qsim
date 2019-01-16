@@ -99,7 +99,7 @@ $result-fh.close;
 # -------------------------------
 
 sub p2-processor($message) {
-    return (random-poisson-distance(60), $message ~ '+');
+    return (random-poisson-distance(120), $message ~ '+');
 }
 
 $example = TestBed.new(producer-func => &tb-producer);
