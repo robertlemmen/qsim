@@ -32,9 +32,9 @@ simple_queue <- read.table("simple-queue-3.data", header = TRUE)
 plot(simple_queue$time, simple_queue$q1_mean, xlab='', ylab='', type='l', ylim=c(0,5), col=c('#a85400'), lwd="2", xaxt='n')
 arrows(simple_queue$time, simple_queue$q1_mean-simple_queue$q1_dev, simple_queue$time, simple_queue$q1_mean+simple_queue$q1_dev, length=0.0, angle=90, code=2, col=c('#a85400'))
 par(new=TRUE)
-plot(simple_queue$time, simple_queue$p1_mean, xlab='', ylab='', type='l', ylim=c(0,4), col=c('#5400a8'), lwd="2", xaxt='n', yaxt='n')
+plot(simple_queue$time, simple_queue$p1_mean, xlab='', ylab='', type='l', ylim=c(0,8), col=c('#5400a8'), lwd="2", xaxt='n', yaxt='n')
 arrows(simple_queue$time, simple_queue$p1_mean-simple_queue$p1_dev, simple_queue$time, simple_queue$p1_mean+simple_queue$p1_dev, length=0.0, angle=90, code=2, col=c('#5400a8'))
-axis(4, at=c(0,1,2,3,4),labels=c(0,1,2,3,4), las=2)
+axis(4, at=c(0,2,4,6,8),labels=c(0,2,4,6,7), las=2)
 
 dev.off()
 

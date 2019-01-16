@@ -28,7 +28,7 @@ $scheduler.register($p1);
 
 my @results;
 for ^1 {
-    my @m = $scheduler.simulate(5000, 10);
+    my @m = $scheduler.simulate(10000, 10);
     @results.push(@m);
 }
 
@@ -62,8 +62,8 @@ dump-results(@results, $result-fh);
 $result-fh.close;
 
 @results = [];
-for ^100 {
-    my @m = $scheduler.simulate(5000, 10);
+for ^250 {
+    my @m = $scheduler.simulate(10000, 10);
     @results.push(@m);
 }
 
@@ -99,12 +99,12 @@ $result-fh.close;
 # -------------------------------
 
 sub p2-processor($message) {
-    return (random-poisson-distance(120), $message ~ '+');
+    return (random-poisson-distance(240), $message ~ '+');
 }
 
 $example = TestBed.new(producer-func => &tb-producer);
 $q1 = Queue.new(id => "q1", size => 5);
-$p1 = Processor.new(id => "p1", proc-func => &p2-processor, capacity => 4);
+$p1 = Processor.new(id => "p1", proc-func => &p2-processor, capacity => 8);
 
 connect($example, $q1);
 connect($q1, $p1);
@@ -116,8 +116,8 @@ $scheduler.register($q1);
 $scheduler.register($p1);
 
 @results = [];
-for ^100 {
-    my @m = $scheduler.simulate(5000, 10);
+for ^250 {
+    my @m = $scheduler.simulate(10000, 10);
     @results.push(@m);
 }
 
