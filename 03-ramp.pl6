@@ -7,7 +7,7 @@ use QSim;
 sub tb-producer() {
     state $i = 0;
     my $interval = 100;
-    if 3000 < $*current-time < 7000 {
+    if 2000 < $*current-time < 8000 {
         $interval = 35;
     }
     return (random-poisson-distance($interval), "m" ~ $i++);
