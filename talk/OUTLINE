@@ -48,6 +48,11 @@ D: Queue Discipline
 
 -> we only care for fifo now
 
+## composable
+
+This idea is so powerful because it is very composable. You can model our entire system as one such block,
+or each component, or parts within the components. turtles all the way down to the cpu, memory bus, IO and networking.
+
 ## poisson process
 
 most important in this are the first two. lets look at some events in time:
