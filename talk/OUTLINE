@@ -1,0 +1,164 @@
+## title slide
+
+this is just clickbait, knowing that hinting at an esoteric and niche computer
+language would lure you all in. in reality I do not want to talk about the
+computer language erlang at all..
+
+## mr erlang, [picture]
+
+...but about the man it was named after! It is interesting however that he has a
+language named after him, that does not happen to everyone. And the reason the
+man got his own computer language is that he wrote the single most important
+work on distributed systems (arguably). And he did this in 1909, talk about
+ahead of the curve!
+
+## queuing theory
+
+MR erlang created a framework to thinkn about processes by modelling them as
+queues and processorsa that consume from these queues and put onto them. The
+foundation and a large part of what we now call queuing theory. He had help from
+others of course, amongst them a fellow named Kendall who contributed a neat
+graphical notation and classification system:
+
+[ kendall notation picture]
+
+A/S/c/K/N/D
+
+A: Arrival process
+
+[table]
+
+S: Service time distribution
+
+[table]
+
+c: number of servers
+
+K: capacity including servers
+
+-> queue size
+
+N: Calling population
+
+-> will only look at unlimited
+
+D: Queue Discipline
+
+[table]
+
+-> we only care for fifo now
+
+## poisson process
+
+most important in this are the first two. lets look at some events in time:
+
+[events]
+
+These are three different distribution models. What is the difference? They all
+have the same rate of occurence. It becomes much more visible in the 
+distance-frequency domain:
+
+[histogram]
+
+one is events that are regularily spaces, but with some error/jitter
+
+the next one is randomly distributed
+
+and the last one follows the poisson process. Which is nefarious because it both
+has really long tails of high distances and a very high occurence of events
+rapidly following each other. and it is the process that models rel-world events
+that are independent from each other. 
+
+## conclusion 1
+
+=> assume poisson distribution in your distribted systems, in scaling testing
+and so forth
+
+## math -> monte carlo
+
+Mr Erlang's work was real, pure math. Which quickly gets so complicated that
+people are still struggling with some edge cases. I am not man enough for real
+math, so I do what every engineer would: monte carlo simulations!
+
+[github link]
+
+## a first example
+
+let's look at the most simple case:
+
+[ picture of most simple network ]
+
+this is how you set this up:
+
+[ some code used to set this up ]
+
+## measuring it
+
+we can then measure processor utilisation and queue length:
+
+[ picture ]
+
+of course this is not really monte carlo, so lets do it many times and
+aggregate:
+
+[ picture ]
+
+## little's law
+
+Playing with this already leads to an interesting observation: the queue (which
+is of unlimited size) is always pretty much empty if the system isn't
+overloaded. or it keeps growing to infinity. 
+
+QUEUES ARE EITHER ALMOST EMPTY OR OVERFLOWING
+
+also known as "little's law", which has more details on what to expact exactly.
+but the main point is
+
+## conclusion 2
+
+=> queues in a working system are always very short
+
+digression: why are the queues at the airport always long then? passengers
+arrive in batches!
+
+and on departures? the bloody border police go for a smoke when the queue gets
+shorter, to make sure people know how improtant they are
+
+## concurrency
+
+[ picture from before ]
+
+Our queuing simulation can of course handle the concurrent case as well. let's
+use 8 threads but make each one take 8 times as much time to handle the request.
+this is first of all not what we typically use concurrency for, we want things
+to get faster. at the same time this is "perfect" concurrency where there are no
+negative effects of doing it. but for teh sake of argument
+
+[ afterwards ]
+
+this has far less variability and noise
+
+## conclusion 3
+
+=> (perfect) concurrency makes a system run smoother because it makes the weird
+cases statistical 
+
+XXX ramp load
+XXX imperfect concurrency -> hysteresis
+XXX overload and recover -> need to limit queues
+XXX timeouts
+XXX limit queue lengths
+XXX timeouts are hard to configure, not entirely transitive, drop from wrong end
+of queue. but they are excellent at clearing queues, and if they can cancel then
+that is fab -> do both!
+XXX implicit queues through concurrency -> limit concurrency
+XXX imperfection is because we do not actually have independent threads, they
+share resources. like trheads share CPU cores. but they also share otehr
+resources. I/O, memory bandwidth, but most importantly application resources.
+e.g. DB connections! @Transactional -> blocking wait means we are using many threads
+to model a system that can only work if they are blocked/idling all the time ->
+
+XXX recap all conclusions
+ 
+
+
