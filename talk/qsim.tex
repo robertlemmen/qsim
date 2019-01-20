@@ -97,8 +97,8 @@
 }
 
 \frame {
-    \center\large\color{egym_orange} 1. Assume poisson distribution in our events
-and processing times, and reflect that in scaling and testing
+    \center\large\color{egym_orange} 1. Real world events are poisson
+distributed over time, which is a pathological case
 }
 
 \begin{frame}[fragile] 
@@ -131,7 +131,7 @@ sub random-events($basename, &random-func) {
 \end{frame}
 
 \begin{frame}[fragile]
-\vspace{1em}
+\vspace{.5em}
 \begin{lstlisting}[language=Perl,basicstyle=\footnotesize]
 my $example = TestBed.new(producer-func => sub () { 
     return (random-poisson-distance(35), "m") });
@@ -144,9 +144,11 @@ connect($example, $q1);
 connect($q1, $p1);
 connect($p1, $example);
 \end{lstlisting}
-\vspace{1em}
+\vspace{.5em}
     \includegraphics[width=\textwidth]{simple1.pdf}
 \end{frame}
+
+% XXX hyper code sample
 
 \frame {
     \begin{center}
@@ -201,5 +203,83 @@ sub tb-producer() {
     \end{center}
 }
 
+\begin{frame}[fragile]
+\vspace{1em}
+\begin{lstlisting}[language=Perl,basicstyle=\footnotesize,deletekeywords={time}]
+sub p2-processor($message) {
+    return (random-poisson-distance(240 * 1.09 ** $*concurrency), 
+        $message ~ '+');
+}
+\end{lstlisting}
+\end{frame}
+
+\frame {
+    \begin{center}
+    \includegraphics[width=\textwidth]{../05-hysteresis.pdf}
+    \end{center}
+}
+
+\frame {
+    \center\large\color{egym_orange} 4. Imperfect concurrency leads to
+hysteresis 
+}
+
+\frame {
+    \begin{center}
+    \includegraphics[width=\textwidth]{../04-overload.pdf}
+    \end{center}
+}
+
+\frame {
+    \center\large\color{egym_orange} 5. Recovery from overload in a efficiently
+sized system can take a long time
+}
+
+\frame {
+    \begin{center}
+    \includegraphics[width=\textwidth]{../06-baseline.pdf}
+    \end{center}
+}
+
+\frame {
+    \begin{center}
+    \includegraphics[width=\textwidth]{../06-qlimit.pdf}
+    \end{center}
+}
+
+\frame {
+    \center\large\color{egym_orange} 6. Limiting queues is efficient in aiding
+recovery, but is still relatively slow at clearing queues
+}
+
+\frame {
+    \begin{center}
+    \includegraphics[width=\textwidth]{../07-deadlines.pdf}
+    \end{center}
+}
+
+% XXX processing time distribution
+
+\frame {
+    \center\large\color{egym_orange} 7. Deadlines are excellent at clearing
+queues, but are hard to configure aggressively enough
+}
+
+\frame {
+    \begin{center}
+    \includegraphics[width=\textwidth]{../08-both.pdf}
+    \end{center}
+}
+
+% XXX processing time distribution
+
+\frame {
+    \center\large\color{egym_orange} 8. The two methods to aid recovery
+compliment each other well
+}
+
+% XXX unlimited concurrency breaks both
+
+% XXX conclusions
 
 \end{document}

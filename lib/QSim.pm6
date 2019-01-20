@@ -56,9 +56,14 @@ class Queue is export {
                 return True;
             }
         }
-        @!queue.push($message);
-        say "  enqueuing $message, now at {@!queue.elems}";
-        # XXX does not handle overflows at the moment
+        if $!size == 0 || @!queue.elems < $!size {
+            @!queue.push($message);
+            say "  enqueuing {$message.perl}, now at {@!queue.elems}";
+        }
+        else {
+            say "   queue overflowing, dropping messages";
+            &*fail($message);
+        }
         return True;
     }
 
@@ -70,7 +75,7 @@ class Queue is export {
         if @!queue.elems {
             if $!sink.handle(@!queue.first) {
                 my $prev-msg = @!queue.shift;
-                say "  dequeued {$prev-msg}, now at {@!queue.elems}";
+                say "  dequeued {$prev-msg.perl}, now at {@!queue.elems}";
                 return True;
             }
             return False;
@@ -117,8 +122,9 @@ class Processor is export {
                     last;
                 }
             }
+            my $*concurrency = $!currently-active;
             my ($done-time, $out-message) = &!proc-func($message);
-            say "  handling $message, will take $done-time";
+            say "  handling {$message.perl}, will take $done-time";
             $*event-scheduler.next-tick-in($done-time);
             @!processing-messages[$free-slot-idx] = $out-message;
             @!processing-done-times[$free-slot-idx] = $*current-time + $done-time;
@@ -140,7 +146,7 @@ class Processor is export {
         for ^$!capacity -> $i {
             if (defined @!processing-done-times[$i]) && $*current-time >= @!processing-done-times[$i] {
                 if $!sink.handle(@!processing-messages[$i]) {
-                    say "  finished processing {@!processing-messages[$i]}";
+                    say "  finished processing {@!processing-messages[$i].perl}";
                     $!currently-active--;
                     @!processing-messages[$i] = Nil;
                     @!processing-done-times[$i] = Nil;
@@ -222,7 +228,7 @@ class TestBed is export {
     }
 
     method handle($message) {
-        say "  $message done!";
+        say "  {$message.perl} done!";
     }
 
     method reset() {
@@ -232,7 +238,7 @@ class TestBed is export {
     method tick() {
         if $*current-time >= $!next-emission {
             my ($next-time, $message) = &!producer-func();
-            say "  testbed emitting $message, next one ine $next-time";
+            say "  testbed emitting {$message.perl}, next one ine $next-time";
             if ! $!sink.handle($message) {
                 # XXX handle better
                 say "$message dropped due to backlog";
@@ -314,6 +320,12 @@ class EventScheduler is export {
             $comp.reset();
         }
 
+        my $failures = 0;
+
+        my &*fail = sub ($m) {
+            $failures++;
+        };
+
         while $next-measurement < $duration {
             say "tick $*current-time";
             while $*current-time >= $next-measurement {
@@ -322,9 +334,10 @@ class EventScheduler is export {
                 for @!components -> $comp {
                     %measurement{$comp.id} = $comp.measure();
                 }
+                %measurement{'fails'} = $failures;
+                $failures = 0;
                 @measurements.push(%measurement);
                 $next-measurement += $measurement-interval;
-                # XXX measure all the things!
             }
             my $run-again;
             # if one component change state, we prod them all again to make sure
