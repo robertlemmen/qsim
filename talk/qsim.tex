@@ -84,23 +84,6 @@
     \end{center}
 }
 
-\frame {
-    \begin{center}
-    \includegraphics[width=\textwidth]{../01-events.pdf}
-    \end{center}
-}
-
-\frame {
-    \begin{center}
-    \includegraphics[width=\textwidth]{../01-histogram.pdf}
-    \end{center}
-}
-
-\frame {
-    \center\large\color{egym_orange} 1. Real world events are poisson
-distributed over time, which is a pathological case
-}
-
 \begin{frame}[fragile] 
 {\color{blue}https://github.com/robertlemmen/qsim/}
 \begin{lstlisting}[language=Perl,basicstyle=\footnotesize]
@@ -130,12 +113,36 @@ sub random-events($basename, &random-func) {
 \end{lstlisting}
 \end{frame}
 
+\frame {
+    \begin{center}
+    \includegraphics[scale=.4]{kendall3.pdf}
+    \end{center}
+}
+
+
+\frame {
+    \begin{center}
+    \includegraphics[width=\textwidth]{../01-events.pdf}
+    \end{center}
+}
+
+\frame {
+    \begin{center}
+    \includegraphics[width=\textwidth]{../01-histogram.pdf}
+    \end{center}
+}
+
+\frame {
+    \center\large\color{egym_orange} 1. Real world events are poisson
+distributed over time, which is a pathological case
+}
+
 \begin{frame}[fragile]
 \vspace{.5em}
 \begin{lstlisting}[language=Perl,basicstyle=\footnotesize]
 my $example = TestBed.new(producer-func => sub () { 
     return (random-poisson-distance(35), "m") });
-my $q1 = Queue.new(id => "q1", size => 5);
+my $q1 = Queue.new(id => "q1", size => 50);
 my $p1 = Processor.new(id => "p1", capacity => 1, 
     proc-func => sub ($msg) { 
         return (random-poisson-distance(30), $message ~ '+') });
@@ -165,6 +172,12 @@ connect($p1, $example);
 \frame {
     \center\large\color{egym_orange} 2. Queues in a working system are almost
 always very short
+}
+
+\frame {
+    \begin{center}
+    \includegraphics[scale=.4]{kendall5.pdf}
+    \end{center}
 }
 
 \frame {
@@ -262,7 +275,8 @@ recovery, but is still relatively slow at clearing queues
 
 \frame {
     \center\large\color{egym_orange} 7. Deadlines are excellent at clearing
-queues, but are hard to configure aggressively enough
+queues, but are hard to configure aggressively enough and are relatively hard to
+implement
 }
 
 \frame {
@@ -278,8 +292,54 @@ queues, but are hard to configure aggressively enough
 compliment each other well
 }
 
-% XXX unlimited concurrency breaks both
+\frame {
+    \begin{center}
+    \includegraphics[scale=.4]{kendall4.pdf}
+    \end{center}
+}
 
-% XXX conclusions
+\frame {
+    \center\large\color{egym_orange} 9. Unlimited concurrency breaks both queue
+limits, deadlines and queuing discipline
+}
+
+\frame {
+\frametitle{Observations}
+\begin{enumerate}
+\item Real world events are poisson
+distributed over time, which is a pathological case
+\item Queues in a working system are almost
+always very short
+\item Perfect concurrency makes the outliers in
+arrival or processing times statistical
+\item Imperfect concurrency leads to
+hysteresis
+\item Recovery from overload in a efficiently
+sized system can take a long time
+\item Limiting queues is efficient in aiding
+recovery, but is still relatively slow at clearing queues
+\item Deadlines are excellent at clearing
+queues, but are hard to configure aggressively enough and are relatively hard to
+implement
+\item The two methods to aid recovery
+compliment each other well
+\item Unlimited concurrency breaks both queue
+limits, deadlines and queuing discipline
+\end{enumerate}
+}
+
+\frame {
+\frametitle{Conclusions}
+\begin{enumerate}
+\item<1-> Use poisson event timing for load tests
+\item<2-> Conservatively limit all the queues
+\item<3-> Use deadlines to clear stale queues
+\item<4-> Limit concurrency to useful values
+\end{enumerate}
+}
+
+\frame {
+\center\Large\color{egym_orange}\bf Thanks!
+}
 
 \end{document}
