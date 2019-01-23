@@ -13,8 +13,6 @@ This is done in the hope that it makes the expression of networks to be
 analyzed more concise. For example, this supports a "failure" mode that directly
 routes to a specific point and skips further processing.
 
-XXX more general docs
-
 =head2 Data Model
 
 The network being analyzed needs to be expressed as a graph of related objects 

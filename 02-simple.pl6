@@ -4,6 +4,10 @@ use lib 'lib';
 
 use QSim;
 
+# this demonstrates the basic queue network setup, a single run as well
+# as a monte carlo run and aggregation. as a third result, it re-runs the 
+# simple model simulation with a concurrent processor
+
 sub tb-producer() {
     state $i = 0;
     return (random-poisson-distance(35), "m" ~ $i++);

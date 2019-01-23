@@ -4,6 +4,9 @@ use lib 'lib';
 
 use QSim;
 
+# like 04, this changes the producer rate over time, btu this time overloads the
+# processor and whos how that recovers from overload
+
 sub tb-producer() {
     state $i = 0;
     my $interval = 34;

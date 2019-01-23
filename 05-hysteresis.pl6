@@ -4,6 +4,9 @@ use lib 'lib';
 
 use QSim;
 
+# this overloads the processor, but also makes the concurrency imperfect,
+# leading to hysteresis in the system, it never recovers
+
 sub tb-producer() {
     state $i = 0;
     my $interval = 60;

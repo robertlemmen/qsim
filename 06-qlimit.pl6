@@ -4,6 +4,9 @@ use lib 'lib';
 
 use QSim;
 
+# this demonstrates the effect queue limiting has on the recovery from overload
+# a system shows
+
 sub tb-producer() {
     state $i = 0;
     my $interval = 38;

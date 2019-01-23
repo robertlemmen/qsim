@@ -4,6 +4,9 @@ use lib 'lib';
 
 use QSim;
 
+# this simulates a simple system in which the production of events changes over
+# time, and shows how processor utilisation and queue sizes respond to that
+
 sub tb-producer() {
     state $i = 0;
     my $interval = 100;

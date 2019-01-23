@@ -9,6 +9,9 @@ constant bin-size = 2;
 constant hist-width = 70;
 constant event-window = 5000;
 
+# this generates timing for different producer funtions, and shows them both in
+# a time-domain as well as a distance-frequency histogram
+
 sub random-events($basename, &random-func) {
     my $i = 0;
     my @hist;

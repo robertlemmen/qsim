@@ -4,6 +4,8 @@ use lib 'lib';
 
 use QSim;
 
+# this uses both deadlines and limited queues to recover from overload
+
 sub tb-producer() {
     state $i = 0;
     my $interval = 40;
